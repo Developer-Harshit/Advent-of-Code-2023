@@ -1,1 +1,3 @@
-### My solutions for Advent of Code 2023
+### Todo
+- [ ] solve day10 part2
+- [ ] improve speed for day12 solution
