@@ -1,98 +1,161 @@
-import json
+"""
+1. find index of Start
+2. find path of loop 
+3. flood fill along normals
+"""
 
-import helper
-
-offsets = [
-    (0, 1),
-    (0, -1),
-    (1, 0),
-    (-1, 0),
-]
+filename = "input.txt"
 
 
-def parse_data(file_path):
-    f = open(file_path)
-    data = json.load(f)
-    return data
+def parse_input():
+    f = open(filename)
+    data = f.readlines()
+    return [list(line.strip()) for line in data]
 
 
-def display():
-    for j in range(height):
-        print(pipe_map[j * width : (j + 1) * width])
+def find_start():
+    for j in range(len(pipeMap)):
+        if "S" in pipeMap[j]:
+            return (pipeMap[j].index("S"), j)
 
 
-def get(x, y):
-    return pipe_map[y * width + x]
+offsets = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
 
-def set(x, y, val):
-    global pipe_map
-    idx = y * width + x
-    pipe_map = pipe_map[:idx] + val + pipe_map[idx + 1 :]
+def within_bounds(x, y):
+    return x < width and y < height and x >= 0 and y >= 0
 
 
-def not_valid(kx, ky):
-
-    return kx < 0 or ky < 0 or kx > width - 1 or ky > height - 1
-
-
-def find_neighbours(kx, ky):
+def find_neighbours(x, y):
     result = []
+
     for off in offsets:
-        nx = kx + off[0]
-        ny = ky + off[1]
-        if not_valid(kx, ky):
-            continue
-        result.append([nx, ny])
+        n = [off[0] + x, off[1] + y]
+        if within_bounds(n[0], n[1]):
+            result.append(n)
     return result
 
 
-new_value = "I"
-loop_value = "#"
-out_value = "-"
+def flood_fill(idx, bound="#", curr="+"):
 
+    open_set = [idx]
 
-def flood_fill(kx, ky):
-    if not_valid(kx, ky):
-        return
-    pipe = get(kx, ky)
-    if pipe == loop_value or pipe == new_value:
-        return
+    while open_set:
 
-    set(kx, ky, new_value)
+        i, j = open_set.pop()
 
-    open_set = find_neighbours(kx, ky)
-    while len(open_set) != 0:
-
-        curr = open_set.pop()
-        if not_valid(curr[0], curr[1]):
+        if not within_bounds(i, j):
             continue
-        curr_pipe = get(curr[0], curr[1])
-        if curr_pipe == loop_value or curr_pipe == new_value:
+        if pipeMap[j][i] not in (bound, curr):
+            pipeMap[j][i] = curr
+            open_set.extend(find_neighbours(i, j))
+
+
+def can_go(dir_x, dir_y, rule):
+    if rule[2]:
+        return dir_x == -rule[0] or dir_y == -rule[1]
+    else:
+        return abs(dir_x) == rule[0] and abs(dir_y) == rule[1]
+
+
+def find_valid_neighbours(x, y):
+
+    neighbour_directions = [
+        (0, 1),
+        (0, -1),
+        (1, 0),
+        (-1, 0),
+    ]
+    valid = []
+    for direction in neighbour_directions:
+        nx = x + direction[0]
+        ny = y + direction[1]
+        if not within_bounds(nx, ny):
             continue
-        set(curr[0], curr[1], new_value)
-        neighbours = find_neighbours(curr[0], curr[1])
-        for neighbour in neighbours:
-            if neighbour not in open_set:
-                open_set.append(neighbour)
+
+        rule = pipe_rules[pipeMap[ny][nx]]
+        if not rule:
+            continue
+
+        if can_go(direction[0], direction[1], rule):
+            valid.append([nx, ny, *direction])
+    return valid
 
 
-data = parse_data("data.json")
-height = data["height"]
-width = data["width"]
-pipe_map = data["map"]
-loop = data["loop"]
+def calculate_directions(dir_x, dir_y, rule):
+    if rule[2]:
+        return (dir_x + rule[0], dir_y + rule[1])
+    else:
+        return (dir_x, dir_y)
 
 
-for i in range(len(loop) - 1):
-    x, y = loop[i]
-    px, py = loop[i + 1]
-    # calculating normal
-    ny = x - px
-    nx = py - y
-
-    flood_fill(px + nx, py + ny)
+def display():
+    for j in pipeMap:
+        print(*j)
 
 
-# display()
-print("result->", pipe_map.count(new_value))
+def copy():
+    res = []
+    for j in origianlMap:
+        res.append([*j])
+    return res
+
+
+pipe_rules = {
+    "|": (0, 1, False),
+    "-": (1, 0, False),
+    "L": (1, -1, True),
+    "J": (-1, -1, True),
+    "7": (-1, 1, True),
+    "F": (1, 1, True),
+    "S": False,
+    ".": False,
+}
+
+origianlMap = parse_input()
+pipeMap = parse_input()
+width = len(pipeMap[0])
+height = len(pipeMap)
+start = find_start()
+
+valid_ends = find_valid_neighbours(start[0], start[1])
+
+display()
+
+for end in valid_ends:
+    x, y, vx, vy = end
+
+    myPath = [(vx, vy)]
+    pipe = origianlMap[y][x]
+
+    while not (x == start[0] and y == start[1]):
+
+        rule = pipe_rules[pipe]
+        vx, vy = calculate_directions(vx, vy, rule)
+        pipeMap[y][x] = "#"
+        x += vx
+        y += vy
+
+        pipe = origianlMap[y][x]
+        myPath.append((vx, vy))
+    pipeMap[start[1]][start[0]] = "#"
+    curr = [*start]
+
+    for i in range(len(myPath)):
+
+        dx, dy = myPath[i % len(myPath)]
+        x, y = curr
+
+        normal = [-dy + x, dx + y]
+        # print(f"normal of {(x,y)} is {normal} in dir of {(dx,dy)}")
+        flood_fill(normal)
+
+        curr[0] += dx
+        curr[1] += dy
+    counter = 0
+    for j in pipeMap:
+        counter += j.count("+")
+    # display()
+    print("Inside count", counter)
+
+    pipeMap = parse_input()

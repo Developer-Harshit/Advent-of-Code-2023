@@ -105,5 +105,5 @@ for end in valid_ends:
 
         steps += 1
 
-print(max(steps_map.values()))
-print(len(steps_map.values()))
+print(len(steps_map.values()) / 2)
+print("Result", max(steps_map.values()))
